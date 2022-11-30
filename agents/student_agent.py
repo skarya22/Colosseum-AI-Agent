@@ -23,6 +23,7 @@ class StudentAgent(Agent):
             "d": 2,
             "l": 3,
         }
+        self.autoplay = True
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
         """
@@ -39,9 +40,8 @@ class StudentAgent(Agent):
 
         Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
         """
-        
-        # dummy return
-        return my_pos, self.dir_map["u"]
+        next_best_move = self.get_best_moves(chess_board, my_pos, adv_pos, max_step)
+        return next_best_move[0]
     
     # from world.py
     def check_valid_step(chess_board, start_pos, end_pos, barrier_dir, adv_pos, max_step):
@@ -143,15 +143,7 @@ class StudentAgent(Agent):
         p1_score = list(father.values()).count(p1_r)
         if p0_r == p1_r:
             return False, p0_score, p1_score
-        player_win = None
-        win_blocks = -1
-        if p0_score > p1_score:
-            player_win = 0
-        elif p0_score < p1_score:
-            player_win = 1
-        else:
-            player_win = -1  # Tie
-        return True, player_win
+        return True, p0_score, p1_score
 
     # Saagar
     def all_moves(self, chess_board, my_pos, adv_pos, max_step):
@@ -206,8 +198,44 @@ class StudentAgent(Agent):
 
     # Catherine
     def get_best_moves(self, chess_board, my_pos, adv_pos, max_step):
+        """
+        Get best moves at current state node to maximize score.
+        Ideally increase points or draw
+
+        Returns: 
+        list_moves = contains the best moves to secure a victory, increase points or draws
+        """
         #return (list of moves)
-        return
+        possible_moves = self.all_moves(chess_board,my_pos, adv_pos, max_step)
+        win_move = []
+        draw_move = []
+        lose_move = []
+
+        for move in possible_moves:
+            simulated_board = deepcopy(chess_board)
+            #put barrier down 
+            StudentAgent.set_barrier(simulated_board,move[0][0], move[0][1], move[1])
+            #check if end of game using the simulated board
+            is_endgame, score1, score2 = StudentAgent.check_endgame(simulated_board, move[0], adv_pos)
+
+            #check if its the end of the game
+            if is_endgame:
+                if score1 > score2: return [move] # return winning move to end the game 
+                elif score1 == score2: draw_move.append(move) #add move to potentially draw points 
+            else:
+                if score1 > score2 : win_move.append(move)
+                elif score1 == score2 : draw_move.append(move)
+                else : lose_move.append(move)
+        
+        if not win_move: #if we have no winning moves, we would want to draw
+            if not draw_move: #if there is no drawing move, we return a list of losing moves 
+                return lose_move[0] 
+            else:
+                return draw_move 
+        else:
+            return win_move 
+
+        
 
 
     
