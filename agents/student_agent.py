@@ -1,7 +1,10 @@
 # Student agent: Add your own agent here
+from copy import deepcopy
 from agents.agent import Agent
 from store import register_agent
 import sys
+import numpy as np
+from collections import deque
 
 
 @register_agent("student_agent")
@@ -40,80 +43,161 @@ class StudentAgent(Agent):
         # dummy return
         return my_pos, self.dir_map["u"]
     
-    # Saagar
-    def check_step_validity(self, chess_board, start_pos, end_pos, adv_pos, max_step, barrier_dir):
+    # from world.py
+    def check_valid_step(chess_board, start_pos, end_pos, barrier_dir, adv_pos, max_step):
         """
-        Returns a boolean value indicating whether the step is valid or not.
+        from world.py
+        Check if the step the agent takes is valid (reachable and within max steps).
+
+        Parameters
+        ----------
+        start_pos : tuple
+            The start position of the agent.
+        end_pos : np.ndarray
+            The end position of the agent.
+        barrier_dir : int
+            The direction of the barrier.
         """
-        # Check if new barrier is taken
-        if chess_board[end_pos[0], end_pos[1], barrier_dir]:
+        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        # Endpoint already has barrier or is boarder
+        r, c = end_pos
+        if chess_board[r, c, barrier_dir]:
             return False
-        # If not moving, then the move is valid regardless
-        if (start_pos[0] == end_pos[0] and start_pos[1] == end_pos[1]):
+        if np.array_equal(start_pos, end_pos):
             return True
-        # Check to see if adv_pos is in the way
-        if (end_pos[0] == adv_pos[0] and end_pos[1] == adv_pos[1]):
-            return False
-            
-        # Check to see if it is possible to make a path to get to end_pos without running out of steps
-        # If it is possible, then the move is valid
-        # If it is not possible, then the move is invalid
 
-        # Breadth first search through all possible paths
-        queue = [(start_pos, 0)]
-        visited = {start_pos}
-        reached = False
-
-        moves = ((0, 1), (1, 0), (0, -1), (-1, 0))
-        while queue and not reached:
-            pos, steps = queue.pop(0)
-            if steps >= max_step:
+        # BFS
+        state_queue = [(start_pos, 0)]
+        visited = {tuple(start_pos)}
+        is_reached = False
+        while state_queue and not is_reached:
+            cur_pos, cur_step = state_queue.pop(0)
+            r, c = cur_pos
+            if cur_step == max_step:
                 break
-            for move in moves:
-                new_pos = (pos[0] + move[0], pos[1] + move[1])
-                if chess_board[pos[0], pos[1], self.dir_map["r"]] and move == moves[1]:
+            for dir, move in enumerate(moves):
+                if chess_board[r, c, dir]:
                     continue
-                if chess_board[pos[0], pos[1], self.dir_map["d"]] and move == moves[0]:
-                    continue
-                if chess_board[pos[0], pos[1], self.dir_map["l"]] and move == moves[2]:
-                    continue
-                if chess_board[pos[0], pos[1], self.dir_map["u"]] and move == moves[3]:
-                    continue
-                if new_pos not in visited:
-                    visited.add(new_pos)
-                    queue.append((new_pos, steps + 1))
-                    if new_pos == end_pos:
-                        reached = True
-                        break
-        return reached
 
-    # Catherine
+                next_pos = cur_pos + move
+                if np.array_equal(next_pos, adv_pos) or tuple(next_pos) in visited:
+                    continue
+                if np.array_equal(next_pos, end_pos):
+                    is_reached = True
+                    break
+
+                visited.add(tuple(next_pos))
+                state_queue.append((next_pos, cur_step + 1))
+
+        return is_reached
+
+    # from world.py
+    def check_endgame(chess_board, p0_pos, p1_pos):
+        """
+        Check if the game ends and compute the current score of the agents.
+
+        Returns
+        -------
+        is_endgame : bool
+            Whether the game ends.
+        player_1_score : int
+            The score of player 1.
+        player_2_score : int
+            The score of player 2.
+        """
+        board_size = chess_board.shape[0]
+        # Moves (Up, Right, Down, Left)
+        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        # Union-Find
+        father = dict()
+        for r in range(board_size):
+            for c in range(board_size):
+                father[(r, c)] = (r, c)
+
+        def find(pos):
+            if father[pos] != pos:
+                father[pos] = find(father[pos])
+            return father[pos]
+
+        def union(pos1, pos2):
+            father[pos1] = pos2
+
+        for r in range(board_size):
+            for c in range(board_size):
+                for dir, move in enumerate(
+                    moves[1:3]
+                ):  # Only check down and right
+                    if chess_board[r, c, dir + 1]:
+                        continue
+                    pos_a = find((r, c))
+                    pos_b = find((r + move[0], c + move[1]))
+                    if pos_a != pos_b:
+                        union(pos_a, pos_b)
+
+        for r in range(board_size):
+            for c in range(board_size):
+                find((r, c))
+        p0_r = find(tuple(p0_pos))
+        p1_r = find(tuple(p1_pos))
+        p0_score = list(father.values()).count(p0_r)
+        p1_score = list(father.values()).count(p1_r)
+        if p0_r == p1_r:
+            return False, p0_score, p1_score
+        player_win = None
+        win_blocks = -1
+        if p0_score > p1_score:
+            player_win = 0
+        elif p0_score < p1_score:
+            player_win = 1
+        else:
+            player_win = -1  # Tie
+        return True, player_win
+
+    # Saagar
     def all_moves(self, chess_board, my_pos, adv_pos, max_step):
         """
-        Returns a list of all possible moves
+        Get all possible moves for the agent. 
         """
-        moves = []
-        for i in range(4):
-            new_pos = (my_pos[0] + (i % 2) * (i - 2), my_pos[1] + (i % 2) * (2 - i)) # check this logic
-            if self.check_step_validity(chess_board, my_pos, new_pos, adv_pos, max_step, i):
-                moves.append(((new_pos[0], new_pos[1]), i))
-        return moves
+        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        possible_moves = []
+        ori_pos = deepcopy(my_pos)
 
-    # Saagar
-    def check_result(self, chess_board, my_pos, adv_pos, max_step):
-        """
-        Returns a boolean value indicating whether the game is over or not.
-        """
+        # use BFS to find all possible moves
+        queue_of_states = [(ori_pos, 0)]
+        visited = {ori_pos}
+        while len(queue_of_states) > 0:
+            cur_pos, cur_step_count = queue_of_states.pop(0)
+            r, c = cur_pos
+            if cur_step_count <= max_step:
+                for dir, move in enumerate(moves):
+                    if chess_board[r, c, dir]:
+                        continue
+                    next_pos = tuple(map(sum, zip(cur_pos, move)))
+                    possible_moves.append((cur_pos, dir))
+                    if (next_pos==adv_pos) or next_pos in visited:
+                        continue
+
+                    visited.add(tuple(next_pos))
+                    queue_of_states.append((next_pos, cur_step_count + 1))
+                    
+            else:
+                break
+        return possible_moves
+
+    # from world.py
+    def set_barrier(chess_board, r, c, dir):
         
-        return False
-
-    # Saagar
-    def create_barrier(self, chess_board, row, column, direction):
-       # returns nothing
-       pass
+        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        # Opposite Directions
+        opposites = {0: 2, 1: 3, 2: 0, 3: 1}
+        # Set the barrier to True
+        chess_board[r, c, dir] = True
+        # Set the opposite barrier to True
+        move = moves[dir]
+        chess_board[r + move[0], c + move[1], opposites[dir]] = True
 
     # Catherine
-    def get_viable_moves(self, chess_board, my_pos, adv_pos, max_step):
+    def get_best_moves(self, chess_board, my_pos, adv_pos, max_step):
         #return (list of moves)
         return
 
