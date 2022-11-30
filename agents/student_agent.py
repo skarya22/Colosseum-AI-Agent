@@ -166,22 +166,30 @@ class StudentAgent(Agent):
         queue_of_states = [(ori_pos, 0)]
         visited = {ori_pos}
         while len(queue_of_states) > 0:
-            cur_pos, cur_step_count = queue_of_states.pop(0)
-            r, c = cur_pos
+            current_pos, cur_step_count = queue_of_states.pop(0)
+            row, col = current_pos
             if cur_step_count <= max_step:
-                for dir, move in enumerate(moves):
-                    if chess_board[r, c, dir]:
+                for direction, move in enumerate(moves):
+                    # if this row, col, direction has a wall, skip
+                    if chess_board[row, col, direction]:
                         continue
-                    next_pos = tuple(map(sum, zip(cur_pos, move)))
-                    possible_moves.append((cur_pos, dir))
-                    if (next_pos==adv_pos) or next_pos in visited:
+                    possible_moves.append((current_pos, direction))
+
+                    # next chosen position is the current_pos + move
+                    next_pos = tuple(map(sum, zip(current_pos, move)))
+                    # if the next position is already visited, skip
+                    if next_pos in visited:
                         continue
+                    # if the next position is the adversary's position, skip
+                    if (next_pos == adv_pos):
+                        continue 
 
                     visited.add(tuple(next_pos))
                     queue_of_states.append((next_pos, cur_step_count + 1))
                     
             else:
                 break
+        #this returns a list of tuples of (position, direction) where position is a tuple of (row, col) and direction is an int
         return possible_moves
 
     # from world.py
