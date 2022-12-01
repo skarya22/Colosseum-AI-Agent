@@ -1,5 +1,6 @@
 # Student agent: Add your own agent here
 from copy import deepcopy
+import random
 from agents.agent import Agent
 from store import register_agent
 import sys
@@ -25,23 +26,6 @@ class StudentAgent(Agent):
         }
         self.autoplay = True
 
-    def step(self, chess_board, my_pos, adv_pos, max_step):
-        """
-        Implement the step function of your agent here.
-        You can use the following variables to access the chess board:
-        - chess_board: a numpy array of shape (x_max, y_max, 4)
-        - my_pos: a tuple of (x, y)
-        - adv_pos: a tuple of (x, y)
-        - max_step: an integer
-
-        You should return a tuple of ((x, y), dir),
-        where (x, y) is the next position of your agent and dir is the direction of the wall
-        you want to put on.
-
-        Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
-        """
-        next_best_move = self.get_best_moves(chess_board, my_pos, adv_pos, max_step)
-        return next_best_move[0]
     
     # from world.py
     def check_valid_step(chess_board, start_pos, end_pos, barrier_dir, adv_pos, max_step):
@@ -143,6 +127,7 @@ class StudentAgent(Agent):
         p1_score = list(father.values()).count(p1_r)
         if p0_r == p1_r:
             return False, p0_score, p1_score
+
         return True, p0_score, p1_score
 
     # Saagar
@@ -220,7 +205,7 @@ class StudentAgent(Agent):
 
             #check if its the end of the game
             if is_endgame:
-                if score1 > score2: return [move] # return winning move to end the game 
+                if score1 > score2: return (is_endgame, simulated_board,[move] )# return winning move to end the game 
                 elif score1 == score2: draw_move.append(move) #add move to potentially draw points 
             else:
                 if score1 > score2 : win_move.append(move)
@@ -229,13 +214,80 @@ class StudentAgent(Agent):
         
         if not win_move: #if we have no winning moves, we would want to draw
             if not draw_move: #if there is no drawing move, we return a list of losing moves 
-                return lose_move[0] 
+                return (is_endgame, simulated_board,lose_move[0] )
             else:
-                return draw_move 
+                return (is_endgame, simulated_board, draw_move )
         else:
-            return win_move 
+            return (is_endgame, simulated_board, win_move )
 
+    def get_next_second_best_move(self, chess_board,first_best_moves, my_pos, adv_pos, max_step):
+        second_win_move = []
+        draw_move = []
+        lose_move = []
+
+        for move in first_best_moves:
+            simulated_chess_board = deepcopy(chess_board)
+            StudentAgent.set_barrier(simulated_chess_board,move[0][0], move[0][1], move[1])
+
+            #check if end of game using the simulated board
+            is_end, score1, score2 = StudentAgent.check_endgame(simulated_chess_board, move[0], adv_pos)
+
+              #check if its the end of the game
+            if is_end:
+                if score1 > score2: return (is_end, 1, simulated_chess_board,[move] )# return winning move to end the game 
+                elif score1 == score2: draw_move.append(move) #add move to potentially draw points 
+            else:
+                if score1 > score2 : second_win_move.append(move)
+                elif score1 == score2 : draw_move.append(move)
+                else : lose_move.append(move)
         
+        if not second_win_move: #if we have no winning moves, we would want to draw
+            if not draw_move: #if there is no drawing move, we return a list of losing moves 
+                return (is_end, 0, lose_move[0] )
+            else:
+                return (is_end, 2, draw_move )
+        else:
+            return (is_end, 1, second_win_move )
+
+    def step(self, chess_board, my_pos, adv_pos, max_step):
+        """
+        Implement the step function of your agent here.
+        You can use the following variables to access the chess board:
+        - chess_board: a numpy array of shape (x_max, y_max, 4)
+        - my_pos: a tuple of (x, y)
+        - adv_pos: a tuple of (x, y)
+        - max_step: an integer
+
+        You should return a tuple of ((x, y), dir),
+        where (x, y) is the next position of your agent and dir is the direction of the wall
+        you want to put on.
+
+        Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
+        """
+      
+        # 0 -> lost 
+        # 1 -> win 
+        # 2 -> draw
+        is_endgame, simulated_chess_board, next_best_move = StudentAgent.get_best_moves(self,chess_board, my_pos, adv_pos, max_step)
+        if(len(next_best_move) == 1 or is_endgame): return next_best_move[0]
+        else:
+            is_endgame, result, next_move =  StudentAgent.get_next_second_best_move(self,simulated_chess_board, next_best_move, my_pos, adv_pos, max_step)
+
+            if(len(next_best_move) == 1): return next_move[0]
+
+            if(result == 1 or result == 2): return random.choice(next_move)
+
+            return next_best_move[0]
+
+            
+        # if is_endgame:
+        #     return next_best_move[0]
+        # else:
+        #    is_endgame, result, next_second_move =  StudentAgent.get_next_second_best_move(self,simulated_chess_board, next_best_move, my_pos, adv_pos, max_step)
+        #    if(result == 1 or result == 2 or (result == 1 and is_endgame == 1)): return next_second_move[0]
+        #    else: return next_best_move[0]
+
+
 
 
     
