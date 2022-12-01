@@ -8,7 +8,7 @@ from copy import deepcopy
 
 
 @pytest.mark.parametrize("board_size", [5, 6, 7])
-@pytest.mark.parametrize("agent", ["random_agent", "student_agent"])
+@pytest.mark.parametrize("agent", ["random_agent", "student_agent", "student_agent2"])
 def test_step(board_size, agent):
     seed = 42
     random.seed(seed)
