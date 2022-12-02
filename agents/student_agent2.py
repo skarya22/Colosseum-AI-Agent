@@ -180,15 +180,18 @@ class StudentAgent(Agent):
 
     def get_best_moves(self, chess_board, my_pos, adv_pos, max_step):
         possible_moves = self.all_moves(chess_board,my_pos, adv_pos, max_step)
+
+        # These arrays will be used to save the positions that are reachable from the current position.
+        # They are separated by whether they will cause the agent to have a higher score than the advarsay, the same score, or a lower score.
         higher_scores = []
         same_scores = []
         lower_scores = []
 
         for move in possible_moves:
             simulated_board = deepcopy(chess_board)
-            #put barrier down 
+            #put barrier down on the simulated board
             StudentAgent.set_barrier(simulated_board,move[0][0], move[0][1], move[1])
-            #check if end of game using the simulated board
+            # find the score of the simulated board
             is_endgame, score1, score2 = StudentAgent.check_endgame(simulated_board, move[0], adv_pos)
             
             #check if its the end of the game
@@ -196,6 +199,7 @@ class StudentAgent(Agent):
                 if score1 > score2: return move # return winning move to end the game 
             else:
                 h = StudentAgent.heuristic(simulated_board, move[0], adv_pos)
+                # save the move in the appropriate array along with the heuristic value
                 if score1 > score2:
                     higher_scores.append((move, is_endgame, h))
                 elif score1 == score2:
@@ -203,18 +207,18 @@ class StudentAgent(Agent):
                 else:
                     lower_scores.append((move, is_endgame))
 
-        # if there is a winning move, return it
-        for score in higher_scores:
-            if score[1]: return score[0]
+        # a "score" has the form (move, is_endgame, heuristic value)
         lowest_h = 500
         lowest_h_move = -1
-        # if there is no winning move, but there is a move that results in a higher score, return it
+        # if there is no winning move, but there is a move that results in a higher score for the agent, return that move
+        # in the case where there is more than one move that fits this criteria, return the move with the lowest heuristic value
         for score in higher_scores:
             if score[2] < lowest_h:
                 lowest_h = score[2]
                 lowest_h_move = score[0]
         if lowest_h_move != -1: return lowest_h_move
-        # if there is no winning move, but there is a move that results in the same score and is not the end of the game, return it
+        # if there is no move where the agent has a higher score, but there is a move that results in the same score and is not the end of the game, return it
+        # in the case where there is more than one move that fits this criteria, return the move with the lowest heuristic value
         for score in same_scores:
             if score[1] == False:
                 if score[2] < lowest_h:
@@ -222,7 +226,7 @@ class StudentAgent(Agent):
                     lowest_h_move = score[0]
         if lowest_h_move != -1:
             return lowest_h_move
-        # if there is no draw that is not endgame, return the draw that is endgame
+        # if there is no move where the scores are the same where the game is not over, return the move that causes the game to draw
         for score in same_scores:
             return score[0]
         # if there is no draw, return the move that results in a lower score where the game does not end
@@ -233,6 +237,8 @@ class StudentAgent(Agent):
             return score[0]
 
     def heuristic(chess_board, pos, adv_pos):
+        # This is the heuristic function that will be used to determine the best move to make.
+        # This first part counts the amount of walls in the area around the agent
         x_pos, y_pos = tuple(pos)
         num_walls = 0
         for i in range(2):
@@ -241,11 +247,11 @@ class StudentAgent(Agent):
                     if chess_board[x_pos + i - 1,y_pos + j - 1,k]:
                         num_walls += 1
 
-        # closer to center the better
+        # This part checks how close the agent is to the center
         center = chess_board.shape[0] // 2
         dist = abs(x_pos - center) + abs(y_pos - center)
 
-        #if adv is surrounded by a lot of walls, it is a good thing
+        # This part checks how many walls are around the adversary
         adv_x, adv_y = tuple(adv_pos)
         num_adv_walls = 0
         for i in range(2):
@@ -254,6 +260,8 @@ class StudentAgent(Agent):
                     if chess_board[adv_x + i - 1,adv_y + j - 1,k]:
                         num_adv_walls += 1
 
+        # We would like to minimize the walls around us, as well as our distance to the center, and would like to maximize
+        # the walls around the adversary. So we return the value below and try to mimimize it.
         return num_walls * 3 + dist - num_adv_walls
     
 
