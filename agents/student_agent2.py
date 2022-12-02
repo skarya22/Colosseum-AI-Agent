@@ -1,5 +1,6 @@
 # Student agent: Add your own agent here
 from copy import deepcopy
+import random
 from agents.agent import Agent
 from store import register_agent
 import sys
@@ -26,7 +27,6 @@ class StudentAgent(Agent):
 
     
     # from world.py
-    # this returns a boolean as to if the move is valid
     def check_valid_step(chess_board, start_pos, end_pos, barrier_dir, adv_pos, max_step):
         """
         from world.py
@@ -75,7 +75,6 @@ class StudentAgent(Agent):
         return is_reached
 
     # from world.py
-    # This returns a boolean as to if the game is over, and the scores of the two players
     def check_endgame(chess_board, p0_pos, p1_pos):
         """
         Check if the game ends and compute the current score of the agents.
@@ -130,19 +129,7 @@ class StudentAgent(Agent):
 
         return True, p0_score, p1_score
 
-    # from world.py
-    def set_barrier(chess_board, r, c, dir):
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
-        # Opposite Directions
-        opposites = {0: 2, 1: 3, 2: 0, 3: 1}
-        # Set the barrier to True
-        chess_board[r, c, dir] = True
-        # Set the opposite barrier to True
-        move = moves[dir]
-        chess_board[r + move[0], c + move[1], opposites[dir]] = True
-        
-    # This returns a list of all possible moves from the current position
-    # [((new row, new column), direction of wall), ...]
+    # Saagar
     def all_moves(self, chess_board, my_pos, adv_pos, max_step):
         """
         Get all possible moves for the agent. 
@@ -181,101 +168,85 @@ class StudentAgent(Agent):
         #this returns a list of tuples of (position, direction) where position is a tuple of (row, col) and direction is an int
         return possible_moves
 
-    # This returns the best move from the current position based on the current state of the board
-    def get_best_moves(self, chess_board, my_pos, adv_pos, max_step):
-        possible_moves = self.all_moves(chess_board,my_pos, adv_pos, max_step)
+    # from world.py
+    def set_barrier(chess_board, r, c, dir):
+        
+        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        # Opposite Directions
+        opposites = {0: 2, 1: 3, 2: 0, 3: 1}
+        # Set the barrier to True
+        chess_board[r, c, dir] = True
+        # Set the opposite barrier to True
+        move = moves[dir]
+        chess_board[r + move[0], c + move[1], opposites[dir]] = True
 
-        # These arrays will be used to save the positions that are reachable from the current position.
-        # They are separated by whether they will cause the agent to have a higher score than the advarsay, the same score, or a lower score.
-        higher_scores = []
-        same_scores = []
-        lower_scores = []
+    # Catherine
+    def get_best_moves(self, chess_board, my_pos, adv_pos, max_step):
+        """
+        Get best moves at current state node to maximize score.
+        Ideally increase points or draw
+
+        Returns: 
+        list_moves = contains the best moves to secure a victory, increase points or draws
+        """
+        #return (list of moves)
+        possible_moves = self.all_moves(chess_board,my_pos, adv_pos, max_step)
+        win_move = []
+        draw_move = []
+        lose_move = []
 
         for move in possible_moves:
             simulated_board = deepcopy(chess_board)
-            #put barrier down on the simulated board
+            #put barrier down 
             StudentAgent.set_barrier(simulated_board,move[0][0], move[0][1], move[1])
-            # find the score of the simulated board
+            #check if end of game using the simulated board
             is_endgame, score1, score2 = StudentAgent.check_endgame(simulated_board, move[0], adv_pos)
-            
+
             #check if its the end of the game
             if is_endgame:
-                if score1 > score2: return move # return winning move to end the game 
+                if score1 > score2: return (is_endgame, simulated_board,[move] )# return winning move to end the game 
+                elif score1 == score2: draw_move.append(move) #add move to potentially draw points 
             else:
-                h = StudentAgent.heuristic(simulated_board, move[0], adv_pos)
-                # save the move in the appropriate array along with the heuristic value
-                if score1 > score2:
-                    higher_scores.append((move, is_endgame, h))
-                elif score1 == score2:
-                    same_scores.append((move, is_endgame, h))
-                else:
-                    lower_scores.append((move, is_endgame))
+                if score1 > score2 : win_move.append(move)
+                elif score1 == score2 : draw_move.append(move)
+                else : lose_move.append(move)
+        
+        if not win_move: #if we have no winning moves, we would want to draw
+            if not draw_move: #if there is no drawing move, we return a list of losing moves 
+                return (is_endgame, simulated_board,lose_move[0] )
+            else:
+                return (is_endgame, simulated_board, draw_move )
+        else:
+            return (is_endgame, simulated_board, win_move )
 
-        # a "score" has the form (move, is_endgame, heuristic value)
+    def get_next_second_best_move(self, chess_board,first_best_moves, my_pos, adv_pos, max_step):
+        second_win_move = []
+        draw_move = []
+        lose_move = []
 
-        lowest_h = 500
-        lowest_h_move = -1
-        # if there is no winning move, but there is a move that results in a higher score for the agent, return that move
-        # in the case where there is more than one move that fits this criteria, return the move with the lowest heuristic value
-        for score in higher_scores:
-            if score[2] < lowest_h:
-                lowest_h = score[2]
-                lowest_h_move = score[0]
-        if lowest_h_move != -1:
-            return lowest_h_move
-        # if there is no move where the agent has a higher score, but there is a move that results in the same score and is not the end of the game, return it
-        # in the case where there is more than one move that fits this criteria, return the move with the lowest heuristic value
-        for score in same_scores:
-            if score[1] == False:
-                if score[2] < lowest_h:
-                    lowest_h = score[2]
-                    lowest_h_move = score[0]
-        if lowest_h_move != -1:
-            return lowest_h_move
-        # if there is no move where the scores are the same where the game is not over, return the move that causes the game to draw
-        for score in same_scores:
-            return score[0]
-        # if there is no draw, return the move that results in a lower score where the game does not end
-        for score in lower_scores:
-            if score[1] == False: 
-                if score[2] < lowest_h:
-                    lowest_h = score[2]
-                    lowest_h_move = score[0]
-        if lowest_h_move != -1:
-            return lowest_h_move
-        # if there is no move that results in a lower score where the game does not end, return the move that results in a lower score where the game ends
-        for score in lower_scores:  
-            return score[0]
+        for move in first_best_moves:
+            simulated_chess_board = deepcopy(chess_board)
+            StudentAgent.set_barrier(simulated_chess_board,move[0][0], move[0][1], move[1])
 
-    # This returns an int. The lower it is, the better that move is
-    def heuristic(chess_board, pos, adv_pos):
-        # This is the heuristic function that will be used to determine the best move to make.
-        # This first part counts the amount of walls in the area around the agent
-        x_pos, y_pos = tuple(pos)
-        num_walls = 0
-        for i in range(2):
-            for j in range(2):
-                for k in range(4):
-                    if chess_board[x_pos + i - 1,y_pos + j - 1,k]:
-                        num_walls += 1
+            #check if end of game using the simulated board
+            is_end, score1, score2 = StudentAgent.check_endgame(simulated_chess_board, move[0], adv_pos)
 
-        # This part checks how close the agent is to the center
-        center = chess_board.shape[0] // 2
-        dist = abs(x_pos - center) + abs(y_pos - center)
-
-        # This part checks how many walls are around the adversary
-        adv_x, adv_y = tuple(adv_pos)
-        num_adv_walls = 0
-        for i in range(2):
-            for j in range(2):
-                for k in range(4):
-                    if chess_board[adv_x + i - 1,adv_y + j - 1,k]:
-                        num_adv_walls += 1
-
-        # We would like to minimize the walls around us, as well as our distance to the center, and would like to maximize
-        # the walls around the adversary. So we return the value below and try to mimimize it.
-        return num_walls * 3 + dist - num_adv_walls
-    
+              #check if its the end of the game
+            if is_end:
+                if score1 > score2: return (is_end, 1, simulated_chess_board,[move] )# return winning move to end the game 
+                elif score1 == score2: draw_move.append(move) #add move to potentially draw points 
+            else:
+                if score1 > score2 : second_win_move.append(move)
+                elif score1 == score2 : draw_move.append(move)
+                else : lose_move.append(move)
+        
+        if not second_win_move: #if we have no winning moves, we would want to draw
+            if not draw_move: #if there is no drawing move, we return a list of losing moves 
+                return (is_end, 0, lose_move[0] )
+            else:
+                return (is_end, 2, draw_move )
+        else:
+            return (is_end, 1, second_win_move )
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
         """
@@ -292,5 +263,31 @@ class StudentAgent(Agent):
 
         Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
         """
+      
+        # 0 -> lost 
+        # 1 -> win 
+        # 2 -> draw
+        is_endgame, simulated_chess_board, next_best_move = StudentAgent.get_best_moves(self,chess_board, my_pos, adv_pos, max_step)
+        if(len(next_best_move) == 1 or is_endgame): return next_best_move[0]
+        else:
+            is_endgame, result, next_move =  StudentAgent.get_next_second_best_move(self,simulated_chess_board, next_best_move, my_pos, adv_pos, max_step)
+
+            if(len(next_best_move) == 1): return next_move[0]
+
+            if(result == 1 or result == 2): return random.choice(next_move)
+
+            return next_best_move[0]
+
+            
+        # if is_endgame:
+        #     return next_best_move[0]
+        # else:
+        #    is_endgame, result, next_second_move =  StudentAgent.get_next_second_best_move(self,simulated_chess_board, next_best_move, my_pos, adv_pos, max_step)
+        #    if(result == 1 or result == 2 or (result == 1 and is_endgame == 1)): return next_second_move[0]
+        #    else: return next_best_move[0]
+
+
+
+
     
-        return StudentAgent.get_best_moves(self,chess_board, my_pos, adv_pos, max_step)
+        
