@@ -238,7 +238,11 @@ class StudentAgent(Agent):
         # if there is no draw, return the move that results in a lower score where the game does not end
         for score in lower_scores:
             if score[1] == False: 
-                return score[0]
+                if score[2] < lowest_h:
+                    lowest_h = score[2]
+                    lowest_h_move = score[0]
+        if lowest_h_move != -1:
+            return lowest_h_move
         # if there is no move that results in a lower score where the game does not end, return the move that results in a lower score where the game ends
         for score in lower_scores:  
             return score[0]
