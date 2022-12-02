@@ -26,6 +26,7 @@ class StudentAgent(Agent):
 
     
     # from world.py
+    # this returns a boolean as to if the move is valid
     def check_valid_step(chess_board, start_pos, end_pos, barrier_dir, adv_pos, max_step):
         """
         from world.py
@@ -74,6 +75,7 @@ class StudentAgent(Agent):
         return is_reached
 
     # from world.py
+    # This returns a boolean as to if the game is over, and the scores of the two players
     def check_endgame(chess_board, p0_pos, p1_pos):
         """
         Check if the game ends and compute the current score of the agents.
@@ -128,7 +130,19 @@ class StudentAgent(Agent):
 
         return True, p0_score, p1_score
 
-    # Saagar
+    # from world.py
+    def set_barrier(chess_board, r, c, dir):
+        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        # Opposite Directions
+        opposites = {0: 2, 1: 3, 2: 0, 3: 1}
+        # Set the barrier to True
+        chess_board[r, c, dir] = True
+        # Set the opposite barrier to True
+        move = moves[dir]
+        chess_board[r + move[0], c + move[1], opposites[dir]] = True
+        
+    # This returns a list of all possible moves from the current position
+    # [((new row, new column), direction of wall), ...]
     def all_moves(self, chess_board, my_pos, adv_pos, max_step):
         """
         Get all possible moves for the agent. 
@@ -167,17 +181,7 @@ class StudentAgent(Agent):
         #this returns a list of tuples of (position, direction) where position is a tuple of (row, col) and direction is an int
         return possible_moves
 
-    # from world.py
-    def set_barrier(chess_board, r, c, dir):
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
-        # Opposite Directions
-        opposites = {0: 2, 1: 3, 2: 0, 3: 1}
-        # Set the barrier to True
-        chess_board[r, c, dir] = True
-        # Set the opposite barrier to True
-        move = moves[dir]
-        chess_board[r + move[0], c + move[1], opposites[dir]] = True
-
+    # This returns the best move from the current position based on the current state of the board
     def get_best_moves(self, chess_board, my_pos, adv_pos, max_step):
         possible_moves = self.all_moves(chess_board,my_pos, adv_pos, max_step)
 
@@ -208,6 +212,7 @@ class StudentAgent(Agent):
                     lower_scores.append((move, is_endgame))
 
         # a "score" has the form (move, is_endgame, heuristic value)
+
         lowest_h = 500
         lowest_h_move = -1
         # if there is no winning move, but there is a move that results in a higher score for the agent, return that move
@@ -216,7 +221,8 @@ class StudentAgent(Agent):
             if score[2] < lowest_h:
                 lowest_h = score[2]
                 lowest_h_move = score[0]
-        if lowest_h_move != -1: return lowest_h_move
+        if lowest_h_move != -1:
+            return lowest_h_move
         # if there is no move where the agent has a higher score, but there is a move that results in the same score and is not the end of the game, return it
         # in the case where there is more than one move that fits this criteria, return the move with the lowest heuristic value
         for score in same_scores:
@@ -231,11 +237,13 @@ class StudentAgent(Agent):
             return score[0]
         # if there is no draw, return the move that results in a lower score where the game does not end
         for score in lower_scores:
-            if score[1] == False: return score[0]
+            if score[1] == False: 
+                return score[0]
         # if there is no move that results in a lower score where the game does not end, return the move that results in a lower score where the game ends
         for score in lower_scores:  
             return score[0]
 
+    # This returns an int. The lower it is, the better that move is
     def heuristic(chess_board, pos, adv_pos):
         # This is the heuristic function that will be used to determine the best move to make.
         # This first part counts the amount of walls in the area around the agent
